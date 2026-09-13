@@ -1,0 +1,153 @@
+{
+  "site": {
+    "name": "L1wyuan Personal Website",
+    "tagline": "记录学习、整理知识、沉淀成长",
+    "externalLinks": [
+      {
+        "label": "GitHub",
+        "url": "    ` ` ` ` ` ` ` ` ` ` ` ` ` ` `/",
+        "icon": "github"
+      },
+      {
+        "label": "CSDN",
+        "url": "https://blog.csdn.net/Derrick__1?spm=1000.2115.3001.5343",
+        "icon": "csdn"
+      }
+    ]
+  },
+  "categories": [
+    {
+      "id": "search",
+      "title": "搜索",
+      "description": "信息检索与搜索技巧",
+      "sections": [
+        {
+          "id": "search-skills",
+          "title": "搜索技巧",
+          "items": [
+            {
+              "id": "search-operators",
+              "title": "常用搜索语法",
+              "type": "md",
+              "path": "search/search-operators"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "notes",
+      "title": "笔记",
+      "description": "学习与项目复盘",
+      "sections": [
+        {
+          "id": "learning-notes",
+          "title": "学习笔记",
+          "items": [
+            {
+              "id": "note-template",
+              "title": "笔记模板",
+              "type": "md",
+              "path": "notes/note-template"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "crawler",
+      "title": "爬虫",
+      "description": "抓取、反爬与工程化",
+      "sections": [
+        {
+          "id": "crawler-basics",
+          "title": "基础入门",
+          "items": [
+            {
+              "id": "requests-basics",
+              "title": "Requests 入门",
+              "type": "md",
+              "path": "crawler/requests-basics"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "reverse",
+      "title": "逆向",
+      "description": "Web/移动端/协议分析",
+      "sections": [
+        {
+          "id": "reverse-basics",
+          "title": "基础",
+          "items": [
+            {
+              "id": "reverse-tooling",
+              "title": "工具与环境",
+              "type": "md",
+              "path": "reverse/tooling"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "ai",
+      "title": "AI",
+      "description": "大模型、Agent 与 RAG",
+      "sections": [
+        {
+          "id": "ai-foundations",
+          "title": "基础",
+          "items": [
+            {
+              "id": "llm-learning-path",
+              "title": "学习路径",
+              "type": "md",
+              "path": "ai/learning-path"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "backend",
+      "title": "后端",
+      "description": "接口、数据库与架构",
+      "sections": [
+        {
+          "id": "backend-fastapi",
+          "title": "FastAPI",
+          "items": [
+            {
+              "id": "fastapi-starter",
+              "title": "FastAPI 起步",
+              "type": "md",
+              "path": "backend/fastapi-starter"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "frontend",
+      "title": "前端",
+      "description": "工程化与组件化",
+      "sections": [
+        {
+          "id": "frontend-basics",
+          "title": "基础",
+          "items": [
+            {
+              "id": "frontend-toolchain",
+              "title": "工具链",
+              "type": "md",
+              "path": "frontend/toolchain"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
