@@ -3,6 +3,10 @@ import { useEffect, useRef } from 'react'
 type Star = {
   x: number
   y: number
+  vx: number
+  vy: number
+  hx: number
+  hy: number
   r: number
   base: number
   amp: number
@@ -28,6 +32,13 @@ type Meteor = {
 }
 
 const TINTS = ['255,255,255', '190,205,255', '255,235,200', '170,220,255']
+
+// 相互牵引的引力参数
+const G = 720000 // 引力强度
+const SOFT = 2600 // 距离软化（防止近距叠合）
+const HOME_K = 0.018 // 回位弹簧（防止整体坍缩/漂走）
+const DAMPING = 0.32 // 速度阻尼 /s
+const VMAX = 26 // 最大速度 px/s
 
 function rand(min: number, max: number) {
   return min + Math.random() * (max - min)
@@ -56,6 +67,7 @@ export function Starfield() {
     let nextMeteorAt = performance.now() + rand(2500, 6000)
     const mouse = { x: 0, y: 0, tx: 0, ty: 0, px: 0, py: 0 }
     let lastMoveAt = 0
+    let lastRelinkAt = 0
 
     // 跟随鼠标的星链
     const CHAIN_NODES = 7
@@ -75,9 +87,15 @@ export function Starfield() {
 
       const count = Math.max(90, Math.min(240, Math.floor((w * h) / 8500)))
       for (let i = 0; i < count; i++) {
+        const x = Math.random() * w
+        const y = Math.random() * h
         stars.push({
-          x: Math.random() * w,
-          y: Math.random() * h,
+          x,
+          y,
+          vx: rand(-4, 4),
+          vy: rand(-4, 4),
+          hx: x,
+          hy: y,
           r: rand(0.4, 1.6),
           base: rand(0.25, 0.75),
           amp: rand(0.1, 0.35),
@@ -86,10 +104,14 @@ export function Starfield() {
           tint: TINTS[Math.floor(Math.random() * TINTS.length)],
         })
       }
+      buildChains()
+    }
 
-      // 星链：把空间上相近的星星连成星座状折线
+    // 星链：把空间上相近的星星连成星座状折线
+    function buildChains() {
+      chains = []
       const used = new Set<Star>()
-      const chainCount = Math.max(4, Math.floor(count / 34))
+      const chainCount = Math.max(4, Math.floor(stars.length / 34))
       for (let c = 0; c < chainCount; c++) {
         let current = stars[Math.floor(Math.random() * stars.length)]
         if (used.has(current)) continue
@@ -114,6 +136,44 @@ export function Starfield() {
         if (points.length >= 3) {
           chains.push({ points, width: rand(0.5, 1), speed: rand(0.2, 0.6), phase: rand(0, Math.PI * 2) })
         }
+      }
+      lastRelinkAt = performance.now()
+    }
+
+    // 星星间的相互引力 + 回位弹簧 + 阻尼
+    function stepPhysics(dt: number) {
+      const n = stars.length
+      for (let i = 0; i < n; i++) {
+        const a = stars[i]
+        for (let j = i + 1; j < n; j++) {
+          const b = stars[j]
+          const dx = b.x - a.x
+          const dy = b.y - a.y
+          const d2 = dx * dx + dy * dy + SOFT
+          const d = Math.sqrt(d2)
+          const f = (G / d2) * dt
+          const nx = dx / d
+          const ny = dy / d
+          a.vx += nx * f
+          a.vy += ny * f
+          b.vx -= nx * f
+          b.vy -= ny * f
+        }
+      }
+
+      const damp = Math.exp(-DAMPING * dt)
+      for (const s of stars) {
+        s.vx = (s.vx + (s.hx - s.x) * HOME_K * dt) * damp
+        s.vy = (s.vy + (s.hy - s.y) * HOME_K * dt) * damp
+
+        const v = Math.hypot(s.vx, s.vy)
+        if (v > VMAX) {
+          s.vx = (s.vx / v) * VMAX
+          s.vy = (s.vy / v) * VMAX
+        }
+
+        s.x += s.vx * dt
+        s.y += s.vy * dt
       }
     }
 
@@ -288,7 +348,14 @@ export function Starfield() {
       }
     }
 
+    let lastFrame = 0
     function tick(now: number) {
+      if (!reduced) {
+        const dt = Math.min(0.05, lastFrame ? (now - lastFrame) / 1000 : 0.016)
+        lastFrame = now
+        stepPhysics(dt)
+        if (now - lastRelinkAt > 5000) buildChains()
+      }
       updatePointerChain(now)
       draw(now)
       raf = requestAnimationFrame(tick)
