@@ -6,6 +6,10 @@ on:
   workflow_dispatch:
   repository_dispatch:
     types: [content-updated]
+  # Content repo changes are picked up by periodic sync (admin has no push
+  # access to this repo's Actions, so content-updated dispatch is unused for now)
+  schedule:
+    - cron: '7,22,37,52 * * * *'
 
 permissions:
   contents: read
