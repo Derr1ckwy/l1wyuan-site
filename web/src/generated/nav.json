@@ -5,7 +5,7 @@
     "externalLinks": [
       {
         "label": "GitHub",
-        "url": "    ` ` ` ` ` ` ` ` ` ` ` ` ` ` `/",
+        "url": "https://github.com/Derr1ckwy",
         "icon": "github"
       },
       {
@@ -49,6 +49,18 @@
               "title": "笔记模板",
               "type": "md",
               "path": "notes/note-template"
+            },
+            {
+              "id": "notes-requests-practice",
+              "title": "爬虫实战笔记",
+              "type": "md",
+              "path": "notes/requests-practice"
+            },
+            {
+              "id": "word",
+              "title": "Word 导入测试",
+              "type": "md",
+              "path": "notes/word-import-test"
             }
           ]
         }

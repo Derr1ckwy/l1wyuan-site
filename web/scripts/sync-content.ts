@@ -49,15 +49,10 @@ async function main() {
 
   let synced = 0
   for (const filePath of mdFiles) {
-    const raw = await fetch(
-      `https://raw.githubusercontent.com/${owner}/${repo}/${branch}/${filePath}`,
-      { headers: { Authorization: `Bearer ${token}` } },
+    const data = await api(
+      `https://api.github.com/repos/${owner}/${repo}/contents/${filePath}?ref=${branch}`,
     )
-    if (!raw.ok) {
-      console.warn(`skip ${filePath}: ${raw.status}`)
-      continue
-    }
-    const text = await raw.text()
+    const text = Buffer.from(data.content, 'base64').toString('utf8')
     const outPath = path.join(root, 'public', filePath)
     await fs.mkdir(path.dirname(outPath), { recursive: true })
     await fs.writeFile(outPath, text, 'utf8')

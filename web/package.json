@@ -6,8 +6,8 @@
   "scripts": {
     "sync:content": "node ./scripts/sync-content.ts",
     "dev": "vite",
-    "build": "tsc -b && vite build",
-    "build:remote": "npm run sync:content && tsc -b && vite build",
+    "build": "tsc -b && vite build && node -e \"require('node:fs').copyFileSync('dist/index.html','dist/404.html')\"",
+    "build:remote": "npm run sync:content && tsc -b && vite build && node -e \"require('node:fs').copyFileSync('dist/index.html','dist/404.html')\"",
     "lint": "eslint .",
     "preview": "vite preview"
   },
