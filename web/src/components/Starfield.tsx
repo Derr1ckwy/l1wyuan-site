@@ -54,7 +54,19 @@ export function Starfield() {
     let chains: Chain[] = []
     let meteors: Meteor[] = []
     let nextMeteorAt = performance.now() + rand(2500, 6000)
-    const mouse = { x: 0, y: 0, tx: 0, ty: 0 }
+    const mouse = { x: 0, y: 0, tx: 0, ty: 0, px: 0, py: 0 }
+    let lastMoveAt = 0
+
+    // 跟随鼠标的星链
+    const CHAIN_NODES = 7
+    let pointerChain: { x: number; y: number }[] = []
+    let pointerChainAlpha = 0
+
+    function initPointerChain() {
+      pointerChain = Array.from({ length: CHAIN_NODES }, () => ({ x: w / 2, y: h / 2 }))
+      mouse.px = w / 2
+      mouse.py = h / 2
+    }
 
     function seed() {
       stars = []
@@ -114,6 +126,7 @@ export function Starfield() {
       cv.style.height = `${h}px`
       c.setTransform(dpr, 0, 0, dpr, 0, 0)
       seed()
+      initPointerChain()
       if (reduced) draw(0)
     }
 
@@ -200,10 +213,83 @@ export function Starfield() {
           c.lineTo(m.x - m.vx * tail, m.y - m.vy * tail)
           c.stroke()
         }
+
+        // 跟随鼠标的星链（最上层）
+        drawPointerChain(px, py)
+      }
+    }
+
+    function updatePointerChain(now: number) {
+      const active = now - lastMoveAt < 2500
+      pointerChainAlpha += ((active ? 1 : 0) - pointerChainAlpha) * 0.07
+      if (pointerChainAlpha < 0.01) return
+
+      const head = pointerChain[0]
+      head.x += (mouse.px - head.x) * 0.34
+      head.y += (mouse.py - head.y) * 0.34
+      for (let i = 1; i < pointerChain.length; i++) {
+        const node = pointerChain[i]
+        const prev = pointerChain[i - 1]
+        node.x += (prev.x - node.x) * 0.27
+        node.y += (prev.y - node.y) * 0.27
+      }
+    }
+
+    function drawPointerChain(px: number, py: number) {
+      if (pointerChainAlpha < 0.02) return
+      const n = pointerChain.length
+
+      // 链身：头部亮、尾部渐淡
+      for (let i = 0; i < n - 1; i++) {
+        const a = pointerChain[i]
+        const b = pointerChain[i + 1]
+        const p = i / (n - 1)
+        const tint = i < 2 ? '152,182,255' : '186,164,255'
+        c.strokeStyle = `rgba(${tint},${(pointerChainAlpha * (0.55 - p * 0.32)).toFixed(3)})`
+        c.lineWidth = 1.8 - p * 1.15
+        c.beginPath()
+        c.moveTo(a.x, a.y)
+        c.lineTo(b.x, b.y)
+        c.stroke()
+      }
+
+      // 节点：头部大亮带辉光，尾部渐小
+      for (let i = 0; i < n; i++) {
+        const node = pointerChain[i]
+        const p = i / (n - 1)
+        const alpha = pointerChainAlpha * (1 - p * 0.62)
+        c.save()
+        c.shadowColor = 'rgba(150,185,255,0.9)'
+        c.shadowBlur = i === 0 ? 16 : 8
+        c.fillStyle = `rgba(236,243,255,${alpha.toFixed(3)})`
+        c.beginPath()
+        c.arc(node.x, node.y, 2.7 * (1 - p * 0.72), 0, Math.PI * 2)
+        c.fill()
+        c.restore()
+      }
+
+      // 链头与附近的背景星星连线（像把星星串进链里）
+      const head = pointerChain[0]
+      let linked = 0
+      for (const s of stars) {
+        if (linked >= 3) break
+        const sx = s.x + px
+        const sy = s.y + py
+        const d = Math.hypot(sx - head.x, sy - head.y)
+        if (d < 120 && d > 20) {
+          c.strokeStyle = `rgba(152,182,255,${(pointerChainAlpha * 0.16).toFixed(3)})`
+          c.lineWidth = 0.6
+          c.beginPath()
+          c.moveTo(head.x, head.y)
+          c.lineTo(sx, sy)
+          c.stroke()
+          linked++
+        }
       }
     }
 
     function tick(now: number) {
+      updatePointerChain(now)
       draw(now)
       raf = requestAnimationFrame(tick)
     }
@@ -211,6 +297,9 @@ export function Starfield() {
     function onMouse(e: MouseEvent) {
       mouse.tx = e.clientX / w - 0.5
       mouse.ty = e.clientY / h - 0.5
+      mouse.px = e.clientX
+      mouse.py = e.clientY
+      lastMoveAt = performance.now()
     }
 
     resize()
