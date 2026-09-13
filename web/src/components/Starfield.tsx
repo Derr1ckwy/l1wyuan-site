@@ -40,6 +40,11 @@ const HOME_K = 0.018 // 回位弹簧（防止整体坍缩/漂走）
 const DAMPING = 0.32 // 速度阻尼 /s
 const VMAX = 26 // 最大速度 px/s
 
+// 鼠标 = 最大的一颗星
+const MOUSE_G = 2600000 // 鼠标引力强度
+const MOUSE_SOFT = 5200 // 鼠标引力软化距离²
+const MOUSE_R = 300 // 引力作用半径 px
+
 function rand(min: number, max: number) {
   return min + Math.random() * (max - min)
 }
@@ -72,7 +77,7 @@ export function Starfield() {
     // 跟随鼠标的星链
     const CHAIN_NODES = 7
     let pointerChain: { x: number; y: number }[] = []
-    let pointerChainAlpha = 0
+    let pointerChainAlpha = 0.3
 
     function initPointerChain() {
       pointerChain = Array.from({ length: CHAIN_NODES }, () => ({ x: w / 2, y: h / 2 }))
@@ -113,29 +118,50 @@ export function Starfield() {
       const used = new Set<Star>()
       const chainCount = Math.max(4, Math.floor(stars.length / 34))
       for (let c = 0; c < chainCount; c++) {
-        let current = stars[Math.floor(Math.random() * stars.length)]
-        if (used.has(current)) continue
-        const points: Star[] = [current]
-        used.add(current)
-        for (let k = 0; k < 4; k++) {
-          let best: Star | null = null
-          let bestDist = Infinity
-          for (const s of stars) {
-            if (used.has(s)) continue
-            const d = Math.hypot(s.x - current.x, s.y - current.y)
-            if (d < bestDist) {
-              bestDist = d
-              best = s
-            }
+        growChain(used)
+      }
+      lastRelinkAt = performance.now()
+    }
+
+    // 从某个未使用的星星出发，贪心地就近连成一条链
+    function growChain(used: Set<Star>) {
+      let current = stars[Math.floor(Math.random() * stars.length)]
+      if (used.has(current)) return
+      const points: Star[] = [current]
+      used.add(current)
+      for (let k = 0; k < 4; k++) {
+        let best: Star | null = null
+        let bestDist = Infinity
+        for (const s of stars) {
+          if (used.has(s)) continue
+          const d = Math.hypot(s.x - current.x, s.y - current.y)
+          if (d < bestDist) {
+            bestDist = d
+            best = s
           }
-          if (!best || bestDist > Math.min(w, h) * 0.28) break
-          points.push(best)
-          used.add(best)
-          current = best
         }
-        if (points.length >= 3) {
-          chains.push({ points, width: rand(0.5, 1), speed: rand(0.2, 0.6), phase: rand(0, Math.PI * 2) })
-        }
+        if (!best || bestDist > Math.min(w, h) * 0.28) break
+        points.push(best)
+        used.add(best)
+        current = best
+      }
+      if (points.length >= 3) {
+        chains.push({ points, width: rand(0.5, 1), speed: rand(0.2, 0.6), phase: rand(0, Math.PI * 2) })
+      }
+    }
+
+    // 星链只增不减：只为尚未入链的星星补充新链，已有的链永不消失
+    function extendChains() {
+      const used = new Set<Star>()
+      for (const ch of chains) {
+        for (const p of ch.points) used.add(p)
+      }
+      const desired = Math.max(4, Math.floor(stars.length / 30))
+      let guard = 0
+      while (chains.length < desired && guard++ < 30) {
+        const before = chains.length
+        growChain(used)
+        if (chains.length === before) break
       }
       lastRelinkAt = performance.now()
     }
@@ -163,8 +189,23 @@ export function Starfield() {
 
       const damp = Math.exp(-DAMPING * dt)
       for (const s of stars) {
-        s.vx = (s.vx + (s.hx - s.x) * HOME_K * dt) * damp
-        s.vy = (s.vy + (s.hy - s.y) * HOME_K * dt) * damp
+        let ax = (s.hx - s.x) * HOME_K
+        let ay = (s.hy - s.y) * HOME_K
+
+        // 鼠标是最大的一颗星：半径内产生向它的引力，越近越强
+        const mdx = mouse.px - s.x
+        const mdy = mouse.py - s.y
+        const md2 = mdx * mdx + mdy * mdy
+        if (md2 < MOUSE_R * MOUSE_R) {
+          const md = Math.sqrt(md2) || 1
+          const fall = 1 - md / MOUSE_R
+          const mf = (MOUSE_G / (md2 + MOUSE_SOFT)) * fall
+          ax += (mdx / md) * mf
+          ay += (mdy / md) * mf
+        }
+
+        s.vx = (s.vx + ax * dt) * damp
+        s.vy = (s.vy + ay * dt) * damp
 
         const v = Math.hypot(s.vx, s.vy)
         if (v > VMAX) {
@@ -281,7 +322,9 @@ export function Starfield() {
 
     function updatePointerChain(now: number) {
       const active = now - lastMoveAt < 2500
-      pointerChainAlpha += ((active ? 1 : 0) - pointerChainAlpha) * 0.07
+      // 常驻最低亮度：星链不消失，鼠标活动时全亮
+      const target = active ? 1 : 0.3
+      pointerChainAlpha += (target - pointerChainAlpha) * 0.07
       if (pointerChainAlpha < 0.01) return
 
       const head = pointerChain[0]
@@ -298,6 +341,35 @@ export function Starfield() {
     function drawPointerChain(px: number, py: number) {
       if (pointerChainAlpha < 0.02) return
       const n = pointerChain.length
+      const head = pointerChain[0]
+
+      // 鼠标 = 最大的一颗星：外层光晕
+      const haloR = 34
+      const halo = c.createRadialGradient(head.x, head.y, 0, head.x, head.y, haloR)
+      halo.addColorStop(0, `rgba(205,222,255,${(0.3 * pointerChainAlpha).toFixed(3)})`)
+      halo.addColorStop(0.4, `rgba(160,185,255,${(0.12 * pointerChainAlpha).toFixed(3)})`)
+      halo.addColorStop(1, 'rgba(160,185,255,0)')
+      c.fillStyle = halo
+      c.fillRect(head.x - haloR, head.y - haloR, haloR * 2, haloR * 2)
+
+      // 被吸附到鼠标周围的星星，与链头连线（像被这颗大星俘获）
+      let captured = 0
+      for (const s of stars) {
+        if (captured >= 6) break
+        const sx = s.x + px
+        const sy = s.y + py
+        const d = Math.hypot(sx - head.x, sy - head.y)
+        if (d < 160 && d > 14) {
+          const k = 1 - d / 160
+          c.strokeStyle = `rgba(170,196,255,${(pointerChainAlpha * (0.08 + 0.22 * k)).toFixed(3)})`
+          c.lineWidth = 0.7
+          c.beginPath()
+          c.moveTo(head.x, head.y)
+          c.lineTo(sx, sy)
+          c.stroke()
+          captured++
+        }
+      }
 
       // 链身：头部亮、尾部渐淡
       for (let i = 0; i < n - 1; i++) {
@@ -320,31 +392,12 @@ export function Starfield() {
         const alpha = pointerChainAlpha * (1 - p * 0.62)
         c.save()
         c.shadowColor = 'rgba(150,185,255,0.9)'
-        c.shadowBlur = i === 0 ? 16 : 8
+        c.shadowBlur = i === 0 ? 18 : 8
         c.fillStyle = `rgba(236,243,255,${alpha.toFixed(3)})`
         c.beginPath()
-        c.arc(node.x, node.y, 2.7 * (1 - p * 0.72), 0, Math.PI * 2)
+        c.arc(node.x, node.y, (i === 0 ? 3.6 : 2.7) * (1 - p * 0.72), 0, Math.PI * 2)
         c.fill()
         c.restore()
-      }
-
-      // 链头与附近的背景星星连线（像把星星串进链里）
-      const head = pointerChain[0]
-      let linked = 0
-      for (const s of stars) {
-        if (linked >= 3) break
-        const sx = s.x + px
-        const sy = s.y + py
-        const d = Math.hypot(sx - head.x, sy - head.y)
-        if (d < 120 && d > 20) {
-          c.strokeStyle = `rgba(152,182,255,${(pointerChainAlpha * 0.16).toFixed(3)})`
-          c.lineWidth = 0.6
-          c.beginPath()
-          c.moveTo(head.x, head.y)
-          c.lineTo(sx, sy)
-          c.stroke()
-          linked++
-        }
       }
     }
 
@@ -354,7 +407,7 @@ export function Starfield() {
         const dt = Math.min(0.05, lastFrame ? (now - lastFrame) / 1000 : 0.016)
         lastFrame = now
         stepPhysics(dt)
-        if (now - lastRelinkAt > 5000) buildChains()
+        if (now - lastRelinkAt > 5000) extendChains()
       }
       updatePointerChain(now)
       draw(now)
