@@ -1,22 +1,24 @@
 import { useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { navData, navPosts } from '../data/nav'
+import { useNav } from './nav-context'
+import { flattenPosts } from '../lib/nav-helpers'
 
 export function SearchBox() {
   const [q, setQ] = useState('')
+  const { nav } = useNav()
 
   const results = useMemo(() => {
     const query = q.trim().toLowerCase()
     if (!query) return []
 
-    const categoryResults = navData.categories
+    const categoryResults = nav.categories
       .filter((category) => category.title.toLowerCase().includes(query))
       .map((category) => ({
         label: `栏目：${category.title}`,
         href: `/c/${category.id}`,
       }))
 
-    const postResults = navPosts
+    const postResults = flattenPosts(nav)
       .filter((post) => post.title.toLowerCase().includes(query))
       .map((post) => ({
         label: `${post.categoryTitle} / ${post.title}`,
@@ -24,7 +26,7 @@ export function SearchBox() {
       }))
 
     return [...categoryResults, ...postResults].slice(0, 8)
-  }, [q])
+  }, [q, nav])
 
   return (
     <div className="search">

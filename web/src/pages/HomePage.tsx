@@ -1,18 +1,21 @@
-import { navData, navDataError, navPosts } from '../data/nav'
+import { navDataError } from '../data/nav'
+import { useNav } from '../components/nav-context'
+import { flattenPosts } from '../lib/nav-helpers'
 import { CategoryGrid } from '../components/CategoryGrid'
 import { ExternalLinks } from '../components/ExternalLinks'
 import { SearchBox } from '../components/SearchBox'
 
 export function HomePage() {
-  const latestPosts = navPosts.slice(0, 5)
+  const { nav } = useNav()
+  const latestPosts = flattenPosts(nav).slice(0, 5)
 
   return (
     <div className="home">
       <header className="hero">
-        <div className="heroTitle">{navData.site.name}</div>
-        <div className="heroTagline">{navData.site.tagline}</div>
+        <div className="heroTitle">{nav.site.name}</div>
+        <div className="heroTagline">{nav.site.tagline}</div>
         <div className="heroRow">
-          <ExternalLinks links={navData.site.externalLinks} />
+          <ExternalLinks links={nav.site.externalLinks} />
           <SearchBox />
         </div>
       </header>
@@ -21,7 +24,7 @@ export function HomePage() {
 
       <section className="block">
         <div className="blockTitle">栏目</div>
-        {navData.categories.length > 0 ? <CategoryGrid /> : (
+        {nav.categories.length > 0 ? <CategoryGrid /> : (
           <div className="muted">当前没有可展示的分类内容。</div>
         )}
       </section>
@@ -39,7 +42,7 @@ export function HomePage() {
       </section>
 
       <footer className="footer">
-        <div className="muted">© {new Date().getFullYear()} {navData.site.name}</div>
+        <div className="muted">© {new Date().getFullYear()} {nav.site.name}</div>
       </footer>
     </div>
   )

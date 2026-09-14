@@ -60,6 +60,14 @@ a {
   pointer-events: none;
 }
 
+/* 图片拖尾画布：浮在内容之上，纯装饰不拦截交互 */
+.imageTrail {
+  position: fixed;
+  inset: 0;
+  z-index: 2;
+  pointer-events: none;
+}
+
 .page,
 .home {
   position: relative;
@@ -369,6 +377,19 @@ a {
   color: var(--muted);
 }
 
+.sectionHead {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+}
+
+.sectionAddBtn {
+  font-size: 12px;
+  padding: 4px 12px;
+  letter-spacing: 0.05em;
+}
+
 .items {
   display: grid;
   gap: 10px;
@@ -515,4 +536,253 @@ a {
   margin-bottom: 12px;
   color: rgba(160, 185, 255, 0.4);
   font-size: 14px;
+}
+
+/* ---------------- 登录入口 / 管理角标 ---------------- */
+
+.authBar {
+  position: fixed;
+  right: 18px;
+  bottom: 18px;
+  z-index: 10;
+}
+
+.authBarAdmin {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 8px 8px 14px;
+  border-radius: 999px;
+  border: 1px solid var(--border-strong);
+  background: var(--panel);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  box-shadow: var(--glow);
+  font-size: 13px;
+}
+
+.authBarBadge {
+  color: var(--accent);
+  letter-spacing: 0.05em;
+}
+
+.authBarBtn {
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--muted);
+  border-radius: 999px;
+  padding: 5px 12px;
+  font-size: 12px;
+  cursor: pointer;
+  transition: border-color 0.16s ease, color 0.16s ease;
+}
+
+.authBarBtn:hover {
+  border-color: var(--border-strong);
+  color: var(--text);
+}
+
+/* ---------------- 页内编辑 ---------------- */
+
+button.pill {
+  cursor: pointer;
+  color: var(--text);
+  font-family: inherit;
+}
+
+.editToggle {
+  border-color: var(--border-strong);
+  color: var(--accent);
+}
+
+.editor {
+  margin-top: 8px;
+}
+
+.editorToolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 14px;
+}
+
+.editorPath {
+  font-family: monospace;
+  font-size: 12px;
+}
+
+.editorMsg {
+  color: var(--accent-2);
+  font-size: 13px;
+}
+
+.editorGrid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  align-items: start;
+}
+
+.editorTextarea {
+  width: 100%;
+  min-height: 520px;
+  resize: vertical;
+  padding: 16px 18px;
+  border-radius: 14px;
+  border: 1px solid var(--border);
+  background: var(--panel);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  color: var(--text);
+  font-family: 'Cascadia Code', Consolas, monospace;
+  font-size: 13.5px;
+  line-height: 1.7;
+  outline: none;
+  transition: border-color 0.16s ease;
+}
+
+.editorTextarea:focus {
+  border-color: var(--border-strong);
+  box-shadow: var(--glow);
+}
+
+.editorPreview {
+  max-height: 80vh;
+  overflow: auto;
+  min-height: 520px;
+  padding: 16px 18px;
+  border-radius: 14px;
+  border: 1px solid var(--border);
+  background: var(--panel);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+}
+
+@media (max-width: 900px) {
+  .editorGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .editorPreview {
+    min-height: 0;
+    max-height: none;
+  }
+}
+
+/* ---------------- 新建笔记对话框 ---------------- */
+
+.modalOverlay {
+  position: fixed;
+  inset: 0;
+  z-index: 30;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(3, 5, 12, 0.66);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+}
+
+.modal {
+  width: min(560px, 92vw);
+  max-height: 86vh;
+  overflow: auto;
+  padding: 22px 24px;
+  border-radius: 16px;
+  border: 1px solid var(--border-strong);
+  background: rgba(10, 14, 26, 0.92);
+  box-shadow: var(--shadow), var(--glow);
+}
+
+.modalTitle {
+  font-size: 18px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  margin-bottom: 16px;
+  color: var(--accent);
+}
+
+.modalLabel {
+  display: block;
+  font-size: 12px;
+  color: var(--muted);
+  letter-spacing: 0.1em;
+  margin: 12px 0 6px;
+}
+
+.modalInput {
+  width: 100%;
+  padding: 9px 12px;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  background: var(--panel);
+  color: var(--text);
+  font-size: 13.5px;
+  font-family: inherit;
+  outline: none;
+  transition: border-color 0.16s ease;
+}
+
+.modalInput:focus {
+  border-color: var(--border-strong);
+}
+
+select.modalInput {
+  appearance: none;
+}
+
+.modalRow {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.modalSrc {
+  font-size: 12.5px;
+  padding: 7px 14px;
+  cursor: pointer;
+  color: var(--muted);
+  font-family: inherit;
+}
+
+.modalSrcOn {
+  color: var(--accent);
+  border-color: var(--border-strong);
+  box-shadow: var(--glow);
+}
+
+.modalTextarea {
+  width: 100%;
+  min-height: 140px;
+  margin-top: 10px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  background: var(--panel);
+  color: var(--text);
+  font-family: 'Cascadia Code', Consolas, monospace;
+  font-size: 13px;
+  line-height: 1.6;
+  outline: none;
+  resize: vertical;
+}
+
+.modalErr {
+  margin-top: 12px;
+  color: #ff9b9b;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.modalActions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 18px;
+}
+
+.modalPrimary {
+  color: var(--accent);
+  border-color: var(--border-strong);
 }

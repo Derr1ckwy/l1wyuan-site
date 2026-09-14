@@ -1,10 +1,11 @@
 import { Link } from 'react-router-dom'
-import { navData } from '../data/nav'
+import { useNav } from './nav-context'
 
 export function CategoryGrid() {
+  const { nav } = useNav()
   return (
     <div className="grid">
-      {navData.categories.map((c) => (
+      {nav.categories.map((c) => (
         <Link key={c.id} className="card" to={`/c/${c.id}`}>
           <div className="cardTitle">{c.title}</div>
           <div className="cardDesc">{c.description}</div>
