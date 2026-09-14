@@ -2,7 +2,10 @@ import { NextResponse } from 'next/server'
 import { requireAdminLogin } from '@/lib/authz'
 import { UpsertMarkdownSchema } from '@/lib/schemas'
 import { upsertTextFile } from '@/lib/github'
+import { invalidate } from '@/lib/cache'
 import { CONTENT_DIR } from '@/lib/config'
+
+export const runtime = 'nodejs'
 
 export async function POST(req: Request) {
   const auth = await requireAdminLogin()
@@ -29,6 +32,9 @@ export async function POST(req: Request) {
     contentText: parsed.data.markdown,
     message,
   })
+
+  // 写后立即失效公开读缓存，保证保存-刷新闭环
+  invalidate(`public:md:${path}`)
 
   // Helps diagnose repo/path/branch mismatches quickly.
   console.log('[upsertMarkdown]', {

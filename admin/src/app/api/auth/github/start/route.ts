@@ -16,5 +16,9 @@ export async function GET(req: Request) {
     scope: 'read:user',
   })
 
+  // 登录成功后想回到的页面（由前端传入完整 URL），放进 OAuth state 带回
+  const next = url.searchParams.get('next')
+  if (next) params.set('state', next)
+
   return NextResponse.redirect(`https://github.com/login/oauth/authorize?${params.toString()}`)
 }

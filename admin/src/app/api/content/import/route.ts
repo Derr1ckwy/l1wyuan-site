@@ -20,12 +20,21 @@ function jsonError(error: string, status: number, extra?: Record<string, unknown
   return NextResponse.json({ ok: false, error, ...extra }, { status })
 }
 
+// mammoth 1.12.3 的类型声明缺少 convertToMarkdown（运行时已存在），这里补齐签名
+const convertToMarkdown = (
+  mammoth as unknown as {
+    convertToMarkdown: (input: {
+      buffer: Buffer
+    }) => Promise<{ value: string; messages: { type: string; message: string }[] }>
+  }
+).convertToMarkdown
+
 async function fileToMarkdown(file: File): Promise<{ markdown: string; warnings: string[] }> {
   const name = file.name.toLowerCase()
 
   if (name.endsWith('.docx')) {
     const buffer = Buffer.from(await file.arrayBuffer())
-    const result = await mammoth.convertToMarkdown({ buffer })
+    const result = await convertToMarkdown({ buffer })
     return {
       markdown: result.value,
       warnings: result.messages.map((m) => `${m.type}: ${m.message}`).slice(0, 5),

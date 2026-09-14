@@ -63,5 +63,18 @@ export async function GET(req: Request) {
 
   await setAdminSession(login)
 
-  return NextResponse.redirect(new URL('/', req.url))
+  // state 里带回登录前页面；只允许本地路径或配置的 WEB_ORIGIN，防开放重定向
+  const rawNext = url.searchParams.get('state')
+  let target = new URL('/', req.url)
+  if (rawNext) {
+    try {
+      const nextUrl = new URL(rawNext)
+      const allowedOrigin = process.env.WEB_ORIGIN ?? new URL(req.url).origin
+      if (nextUrl.origin === allowedOrigin) target = nextUrl
+    } catch {
+      // 非法 URL，回首页
+    }
+  }
+
+  return NextResponse.redirect(target)
 }
