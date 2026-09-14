@@ -1,18 +1,20 @@
 import { useEffect, useRef } from 'react'
 
 type Star = {
+  id: number
   x: number
   y: number
   vx: number
   vy: number
-  hx: number
-  hy: number
   r: number
   base: number
   amp: number
   speed: number
   phase: number
   tint: string
+  life: number // 剩余寿命 s，耗尽后淡出并从屏幕外重新飘入
+  fade: number // 0~1 显隐过渡
+  dying: boolean
 }
 
 type Chain = {
@@ -33,17 +35,32 @@ type Meteor = {
 
 const TINTS = ['255,255,255', '190,205,255', '255,235,200', '170,220,255']
 
-// 相互牵引的引力参数
-const G = 720000 // 引力强度
-const SOFT = 2600 // 距离软化（防止近距叠合）
-const HOME_K = 0.018 // 回位弹簧（防止整体坍缩/漂走）
-const DAMPING = 0.32 // 速度阻尼 /s
-const VMAX = 26 // 最大速度 px/s
+// 相互影响参数：纯切向环绕 + 随机游走 + 近距斥力（没有任何吸引力 → 从构造上不会聚集）
+const INTERACT_R = 120 // 只有近邻互相影响 px
+const SWIRL_F = 8000 // 近邻环绕强度：让星星相互绕转，但只绕不吸
+const WANDER = 18 // 随机游走强度：打散涡旋相干，保持漂移感
+const DAMPING = 0.08 // 速度阻尼 /s（很小，保持漂流感）
+const VMAX = 40 // 最大速度 px/s
+const SOFT = 2600 // 距离软化（防止近距力过大）
+const REPEL_R = 12 // 近距斥力半径 px
+const REPEL_K = 30 // 近距斥力强度
 
-// 鼠标 = 最大的一颗星
-const MOUSE_G = 2600000 // 鼠标引力强度
-const MOUSE_SOFT = 5200 // 鼠标引力软化距离²
-const MOUSE_R = 300 // 引力作用半径 px
+// 鼠标 = 一股反引力风：靠近的星星被向外推开（蒲公英式），永不聚集
+const MOUSE_G = 1500000 // 鼠标推力强度
+const MOUSE_SOFT = 5200 // 鼠标推力软化距离²
+const MOUSE_R = 240 // 推力作用半径 px
+const MOUSE_SWIRL = 0.4 // 切向分量：星星打着旋儿被吹开
+const MOUSE_IDLE_T = 3.5 // 鼠标静止时间常数 s：静止后推力指数衰减，星星漂回
+
+// 星星生命周期：死亡后从屏幕外随机一边重新飘入，源源不断
+const LIFE_MIN = 45 // 寿命 s
+const LIFE_MAX = 100
+const FADE_IN = 1.2 // 出生淡入速率 /s
+const FADE_OUT = 2 // 死亡淡出速率 /s
+const SPAWN_MARGIN = 40 // 出生点藏在屏幕外多远处 px
+const IN_SPEED_MIN = 8 // 飘入速度 px/s
+const IN_SPEED_MAX = 20
+const CHAIN_BREAK = 200 // 星座连线两端星星超过这个距离就断开（被推散后不拉长途直线）
 
 function rand(min: number, max: number) {
   return min + Math.random() * (max - min)
@@ -90,26 +107,63 @@ export function Starfield() {
       chains = []
       meteors = []
 
-      const count = Math.max(90, Math.min(240, Math.floor((w * h) / 8500)))
+      const count = Math.max(400, Math.min(1500, Math.floor((w * h) / 864)))
       for (let i = 0; i < count; i++) {
-        const x = Math.random() * w
-        const y = Math.random() * h
         stars.push({
-          x,
-          y,
-          vx: rand(-4, 4),
-          vy: rand(-4, 4),
-          hx: x,
-          hy: y,
-          r: rand(0.4, 1.6),
-          base: rand(0.25, 0.75),
-          amp: rand(0.1, 0.35),
+          id: i,
+          x: Math.random() * w,
+          y: Math.random() * h,
+          vx: rand(-8, 8),
+          vy: rand(-8, 8),
+          r: rand(0.3, 1.2),
+          base: rand(0.15, 0.55),
+          amp: rand(0.08, 0.3),
           speed: rand(0.4, 1.4),
           phase: rand(0, Math.PI * 2),
           tint: TINTS[Math.floor(Math.random() * TINTS.length)],
+          life: rand(LIFE_MIN, LIFE_MAX),
+          fade: Math.random(), // 首屏星星错开淡入
+          dying: false,
         })
       }
       buildChains()
+    }
+
+    // 星星从屏幕外随机一条边飘入：随机边、随机位置、随机内向速度
+    function spawnStar(s: Star) {
+      const edge = Math.floor(Math.random() * 4)
+      const speed = rand(IN_SPEED_MIN, IN_SPEED_MAX)
+      const tangential = rand(-8, 8)
+      if (edge === 0) {
+        s.x = rand(0, w)
+        s.y = -SPAWN_MARGIN
+        s.vx = tangential
+        s.vy = speed
+      } else if (edge === 1) {
+        s.x = w + SPAWN_MARGIN
+        s.y = rand(0, h)
+        s.vx = -speed
+        s.vy = tangential
+      } else if (edge === 2) {
+        s.x = rand(0, w)
+        s.y = h + SPAWN_MARGIN
+        s.vx = tangential
+        s.vy = -speed
+      } else {
+        s.x = -SPAWN_MARGIN
+        s.y = rand(0, h)
+        s.vx = speed
+        s.vy = tangential
+      }
+      s.r = rand(0.3, 1.2)
+      s.base = rand(0.15, 0.55)
+      s.amp = rand(0.08, 0.3)
+      s.speed = rand(0.4, 1.4)
+      s.phase = rand(0, Math.PI * 2)
+      s.tint = TINTS[Math.floor(Math.random() * TINTS.length)]
+      s.life = rand(LIFE_MIN, LIFE_MAX)
+      s.fade = 0
+      s.dying = false
     }
 
     // 星链：把空间上相近的星星连成星座状折线
@@ -140,7 +194,7 @@ export function Starfield() {
             best = s
           }
         }
-        if (!best || bestDist > Math.min(w, h) * 0.28) break
+        if (!best || bestDist > Math.min(w, h) * 0.2) break
         points.push(best)
         used.add(best)
         current = best
@@ -151,7 +205,16 @@ export function Starfield() {
     }
 
     // 星链只增不减：只为尚未入链的星星补充新链，已有的链永不消失
+    // 例外：所有连线都断开的链（星星被推散/换位置）会被移除，腾出星星组成新星座
     function extendChains() {
+      chains = chains.filter((ch) => {
+        for (let i = 0; i < ch.points.length - 1; i++) {
+          const a = ch.points[i]
+          const b = ch.points[i + 1]
+          if (Math.hypot(b.x - a.x, b.y - a.y) <= CHAIN_BREAK) return true
+        }
+        return false
+      })
       const used = new Set<Star>()
       for (const ch of chains) {
         for (const p of ch.points) used.add(p)
@@ -166,42 +229,88 @@ export function Starfield() {
       lastRelinkAt = performance.now()
     }
 
-    // 星星间的相互引力 + 回位弹簧 + 阻尼
+    // 近邻间的相互影响：空间网格加速（1500 颗时 O(n²) 会卡死，只查 3×3 邻格）
+    // 纯切向环绕 + 近距斥力（无吸引力，星星只绕不吸，不会聚集）
     function stepPhysics(dt: number) {
-      const n = stars.length
-      for (let i = 0; i < n; i++) {
-        const a = stars[i]
-        for (let j = i + 1; j < n; j++) {
-          const b = stars[j]
-          const dx = b.x - a.x
-          const dy = b.y - a.y
-          const d2 = dx * dx + dy * dy + SOFT
-          const d = Math.sqrt(d2)
-          const f = (G / d2) * dt
-          const nx = dx / d
-          const ny = dy / d
-          a.vx += nx * f
-          a.vy += ny * f
-          b.vx -= nx * f
-          b.vy -= ny * f
+      // 把星星装进网格格子
+      const CELL = INTERACT_R
+      const cellKey = (cx: number, cy: number) => (cx + 16) * 64 + (cy + 16)
+      const grid = new Map<number, Star[]>()
+      for (const s of stars) {
+        const k = cellKey(Math.floor(s.x / CELL), Math.floor(s.y / CELL))
+        const arr = grid.get(k)
+        if (arr) arr.push(s)
+        else grid.set(k, [s])
+      }
+
+      // 每对星星只处理一次（b.id > a.id）
+      for (const a of stars) {
+        const cx = Math.floor(a.x / CELL)
+        const cy = Math.floor(a.y / CELL)
+        for (let ix = cx - 1; ix <= cx + 1; ix++) {
+          for (let iy = cy - 1; iy <= cy + 1; iy++) {
+            const arr = grid.get(cellKey(ix, iy))
+            if (!arr) continue
+            for (const b of arr) {
+              if (b.id <= a.id) continue
+              const dx = b.x - a.x
+              const dy = b.y - a.y
+              const rawD2 = dx * dx + dy * dy
+              if (rawD2 > INTERACT_R * INTERACT_R) continue
+              const d2 = rawD2 + SOFT
+              const d = Math.sqrt(d2)
+              const nx = dx / d
+              const ny = dy / d
+              // 纯切向：星星相互绕转（局部小漩涡），不产生任何吸引
+              const sw = (SWIRL_F / d2) * dt
+              const ax = -ny * sw
+              const ay = nx * sw
+              a.vx += ax
+              a.vy += ay
+              b.vx -= ax
+              b.vy -= ay
+
+              // 近距斥力：靠得太近就推开，杜绝坍缩成一个点
+              if (rawD2 < REPEL_R * REPEL_R && rawD2 > 0.01) {
+                const rd = Math.sqrt(rawD2)
+                const push = REPEL_K * (1 - rd / REPEL_R) * dt
+                const rx = (dx / rd) * push
+                const ry = (dy / rd) * push
+                a.vx -= rx
+                a.vy -= ry
+                b.vx += rx
+                b.vy += ry
+              }
+            }
+          }
         }
       }
 
       const damp = Math.exp(-DAMPING * dt)
       for (const s of stars) {
-        let ax = (s.hx - s.x) * HOME_K
-        let ay = (s.hy - s.y) * HOME_K
+        // 随机游走：布朗运动式的小幅随机加速，打散相干漩涡、保持漂流感
+        let ax = rand(-WANDER, WANDER)
+        let ay = rand(-WANDER, WANDER)
 
-        // 鼠标是最大的一颗星：半径内产生向它的引力，越近越强
+        // 鼠标是一股"反引力风"：半径内的星星被向外推开（蒲公英式），永不聚集
+        // 推力随静止时间指数衰减：鼠标不动几秒后星星漂回，恢复漫天分布
         const mdx = mouse.px - s.x
         const mdy = mouse.py - s.y
         const md2 = mdx * mdx + mdy * mdy
         if (md2 < MOUSE_R * MOUSE_R) {
-          const md = Math.sqrt(md2) || 1
-          const fall = 1 - md / MOUSE_R
-          const mf = (MOUSE_G / (md2 + MOUSE_SOFT)) * fall
-          ax += (mdx / md) * mf
-          ay += (mdy / md) * mf
+          const idleSec = (performance.now() - lastMoveAt) / 1000
+          const idleFade = Math.exp(-idleSec / MOUSE_IDLE_T)
+          if (idleFade > 0.02) {
+            const md = Math.sqrt(md2) || 1
+            const fall = 1 - md / MOUSE_R
+            const mf = (MOUSE_G / (md2 + MOUSE_SOFT)) * fall * idleFade
+            const nx = mdx / md
+            const ny = mdy / md
+            const sw = MOUSE_SWIRL * mf
+            // 径向向外推 + 一点切向：星星打着旋儿被吹开
+            ax += -nx * mf - ny * sw
+            ay += -ny * mf + nx * sw
+          }
         }
 
         s.vx = (s.vx + ax * dt) * damp
@@ -215,6 +324,20 @@ export function Starfield() {
 
         s.x += s.vx * dt
         s.y += s.vy * dt
+      }
+    }
+
+    // 生命周期：寿命耗尽开始淡出，完全隐去后从屏幕外飘入重生
+    function stepLife(dt: number) {
+      for (const s of stars) {
+        if (!s.dying) {
+          s.life -= dt
+          if (s.life <= 0) s.dying = true
+        }
+        const target = s.dying ? 0 : 1
+        const rate = s.dying ? FADE_OUT : FADE_IN
+        s.fade += (target - s.fade) * (1 - Math.exp(-rate * dt))
+        if (s.dying && s.fade <= 0.01) spawnStar(s)
       }
     }
 
@@ -255,19 +378,23 @@ export function Starfield() {
 
       c.clearRect(0, 0, w, h)
 
-      // 星链连线（微弱、缓慢呼吸）
+      // 星链连线（微弱、缓慢呼吸；两端星星隐去时段同步变淡）
       for (const chain of chains) {
-        const alpha = 0.05 + 0.045 * (0.5 + 0.5 * Math.sin(t * chain.speed + chain.phase))
-        c.strokeStyle = `rgba(150,175,255,${alpha.toFixed(3)})`
-        c.lineWidth = chain.width
-        c.beginPath()
-        chain.points.forEach((s, i) => {
-          const x = s.x + px * 0.6
-          const y = s.y + py * 0.6
-          if (i === 0) c.moveTo(x, y)
-          else c.lineTo(x, y)
-        })
-        c.stroke()
+        const breath = 0.05 + 0.045 * (0.5 + 0.5 * Math.sin(t * chain.speed + chain.phase))
+        for (let i = 0; i < chain.points.length - 1; i++) {
+          const s0 = chain.points[i]
+          const s1 = chain.points[i + 1]
+          // 两端星星被推得太远就断开这条连线（否则散架的星座会拉出长途直线）
+          if (Math.hypot(s1.x - s0.x, s1.y - s0.y) > CHAIN_BREAK) continue
+          const alpha = breath * Math.min(s0.fade, s1.fade)
+          if (alpha < 0.004) continue
+          c.strokeStyle = `rgba(150,175,255,${alpha.toFixed(3)})`
+          c.lineWidth = chain.width
+          c.beginPath()
+          c.moveTo(s0.x + px * 0.6, s0.y + py * 0.6)
+          c.lineTo(s1.x + px * 0.6, s1.y + py * 0.6)
+          c.stroke()
+        }
       }
 
       // 星星（三层视差 + 闪烁）
@@ -280,7 +407,8 @@ export function Starfield() {
         for (let i = li; i < stars.length; i += layers.length) {
           const s = stars[i]
           const tw = reduced ? 0 : Math.sin(t * s.speed + s.phase) * s.amp
-          const alpha = Math.max(0.05, Math.min(1, s.base + tw))
+          const alpha = Math.max(0.05, Math.min(1, s.base + tw)) * s.fade
+          if (alpha < 0.01) continue
           c.fillStyle = `rgba(${s.tint},${alpha.toFixed(3)})`
           c.beginPath()
           c.arc(s.x + px * layer.factor, s.y + py * layer.factor, s.r * layer.size, 0, Math.PI * 2)
@@ -352,7 +480,7 @@ export function Starfield() {
       c.fillStyle = halo
       c.fillRect(head.x - haloR, head.y - haloR, haloR * 2, haloR * 2)
 
-      // 被吸附到鼠标周围的星星，与链头连线（像被这颗大星俘获）
+      // 被风吹到的星星，与链头连线（像被这股风掀起的星尘）
       let captured = 0
       for (const s of stars) {
         if (captured >= 6) break
@@ -360,7 +488,7 @@ export function Starfield() {
         const sy = s.y + py
         const d = Math.hypot(sx - head.x, sy - head.y)
         if (d < 160 && d > 14) {
-          const k = 1 - d / 160
+          const k = (1 - d / 160) * s.fade
           c.strokeStyle = `rgba(170,196,255,${(pointerChainAlpha * (0.08 + 0.22 * k)).toFixed(3)})`
           c.lineWidth = 0.7
           c.beginPath()
@@ -407,6 +535,7 @@ export function Starfield() {
         const dt = Math.min(0.05, lastFrame ? (now - lastFrame) / 1000 : 0.016)
         lastFrame = now
         stepPhysics(dt)
+        stepLife(dt)
         if (now - lastRelinkAt > 5000) extendChains()
       }
       updatePointerChain(now)
